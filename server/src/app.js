@@ -19,10 +19,16 @@ const app = express();
 // CORS — allowed origins
 // • Any http://localhost:* port is allowed (Vite dev server can use 5173, 5174, 5175, …)
 // • Explicit production domains are whitelisted by exact match
+// • CLIENT_URL may hold several comma-separated origins (e.g. custom domain + Vercel URL)
 const PRODUCTION_ORIGINS = [
   'https://action-psi-opal.vercel.app',
-  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
+  ...(process.env.CLIENT_URL || '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/+$/, ''))
+    .filter(Boolean),
 ];
+
+const LOCALHOST_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 app.use(
   cors({
@@ -31,16 +37,15 @@ app.use(
       if (!origin) return callback(null, true);
 
       // Any localhost port — allow (covers 5173, 5174, 5175, etc.)
-      if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
-        return callback(null, true);
-      }
+      if (LOCALHOST_ORIGIN.test(origin)) return callback(null, true);
 
       // Explicit production whitelist — allow
-      if (PRODUCTION_ORIGINS.includes(origin)) {
-        return callback(null, true);
-      }
+      if (PRODUCTION_ORIGINS.includes(origin)) return callback(null, true);
 
-      callback(new Error(`CORS: origin '${origin}' is not allowed`));
+      // Deny without throwing: the request gets no CORS headers instead of a
+      // misleading 500 from the error handler, and the log names the origin.
+      console.warn(`[CORS] blocked origin: ${origin}`);
+      callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

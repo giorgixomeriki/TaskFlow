@@ -1,4 +1,12 @@
 require('dotenv').config();
+
+// Fail fast with a clear log line instead of serving 500s on every auth request
+const missingEnv = ['DATABASE_URL', 'JWT_SECRET'].filter((name) => !process.env[name]);
+if (missingEnv.length) {
+  console.error(`❌ Missing required environment variables: ${missingEnv.join(', ')}`);
+  process.exit(1);
+}
+
 const app = require('./app');
 const { seedExercises } = require('./services/gym.service');
 const prisma = require('./lib/prisma');
